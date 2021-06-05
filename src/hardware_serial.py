@@ -50,11 +50,11 @@ def read_message(connection, payload_size):# -> Message:
     return unpack_message(response_data, payload_size)
 
 
-def rotate_gimbal(yaw_speed):
+def rotate_gimbal():
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
                                pitch_mode=0, pitch_speed=40, pitch_angle=0,
-                               yaw_mode=2, yaw_speed=40, yaw_angle=-9000)
+                               yaw_mode=0, yaw_speed=40, yaw_angle=0)
     print('command to send:', control_data)
     packed_control_data = pack_control_data(control_data)
     print('packed command as payload:', packed_control_data)
@@ -70,13 +70,22 @@ def rotate_gimbal(yaw_speed):
     print('received confirmation:', message)
     print('confirmed command with ID:', ord(message.payload))
 
-def test(yaw_speed):
-    while 1:
-        rotate_gimbal(-200)
-        time.sleep(5)
-        rotate_gimbal(200)
-        time.sleep(5)
+# Moves gimbal with given input speed
+def move_gimbal(yaw_speed,pitch_speed):
+    CMD_CONTROL = 67
+    control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
+                               pitch_mode=1, pitch_speed=pitch_speed, pitch_angle=0,
+                               yaw_mode=1, yaw_speed=yaw_speed, yaw_angle=0)
+    # packing and sending
+    packed_control_data = pack_control_data(control_data)
+    message = create_message(CMD_CONTROL, packed_control_data)
+    packed_message = pack_message(message)
+    connection = serial.Serial('/dev/ttyUSB0', baudrate=115200, timeout=10)
+    connection.write(packed_message)
+    # reading confirmaton
+    message = read_message(connection, 1)
+    print('received confirmation:', message)
+    print('confirmed command with ID:', ord(message.payload))
 
-
-if __name__ == '__main__':
-    rotate_gimbal(0)
+# if __name__ == '__main__':
+#     rotate_gimbal()

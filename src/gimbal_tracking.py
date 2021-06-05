@@ -4,6 +4,10 @@ import sensor_msgs
 import vision_msgs
 from vision_msgs.msg import Detection2DArray
 
+import pid_controller
+from hardware_serial import move_gimbal
+
+pid = pid_controller.Controller()
 
 
 def cb_detection(data):
@@ -13,10 +17,12 @@ def cb_detection(data):
         height = data.detections[0].source_img.height
         x = data.detections[0].bbox.center.x #bredde pixelkoordinat (0,640)
         y = data.detections[0].bbox.center.y #hoyde pixelkoordinat (0,512)
- 
-        # print("height: %s width: %s" % (height,width))
-        print("detected: x: %s  y: %s" % (x,y))
 
+        print("detected: x: %s  y: %s" % (x,y))
+        global pid
+        u_yaw,u_pitch = pid.get_input(x,y)
+        move_gimbal(u_yaw,u_pitch)
+        
 
 
 

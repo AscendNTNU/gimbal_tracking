@@ -1,9 +1,14 @@
-from collections import namedtuple
-
 import serial
 import struct
-
 import time
+from collections import namedtuple
+
+
+### - Verify correct USB tty port - ###
+USB_PORT = '/dev/ttyUSB0'
+
+
+
 
 # outgoing CMD_CONTROL - control gimbal movement
 ControlData = namedtuple(
@@ -21,9 +26,6 @@ def pack_control_data(control_data):
 
 def create_message(command_id, payload): #-> Message
     payload_size = len(payload)
-    print('payload_size: %s' % payload_size)
-    a = sum(bytearray(payload)) % 256
-    print('payload_checksum: %s' % a)
     return Message(start_character=ord('>'),
                    command_id=command_id,
                    payload_size=payload_size,
@@ -46,11 +48,11 @@ def read_message(connection, payload_size):# -> Message:
     # 5 is the length of the header + payload checksum byte
     # 1 is the payload size
     response_data = connection.read(5 + payload_size)
-    print('received response', response_data)
+    # print('received response', response_data)
     return unpack_message(response_data, payload_size)
 
 
-def rotate_gimbal():
+def test_rotate_gimbal():
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
                                pitch_mode=0, pitch_speed=40, pitch_angle=0,
@@ -63,7 +65,7 @@ def rotate_gimbal():
     packed_message = pack_message(message)
     print('packed message:', packed_message)
 
-    connection = serial.Serial('/dev/ttyUSB0', baudrate=115200, timeout=10)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
     print('send packed message:', packed_message)
     connection.write(packed_message)
     message = read_message(connection, 1)
@@ -80,12 +82,11 @@ def move_gimbal(yaw_speed,pitch_speed):
     packed_control_data = pack_control_data(control_data)
     message = create_message(CMD_CONTROL, packed_control_data)
     packed_message = pack_message(message)
-    connection = serial.Serial('/dev/ttyUSB0', baudrate=115200, timeout=10)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
     connection.write(packed_message)
     # reading confirmaton
     message = read_message(connection, 1)
-    print('received confirmation:', message)
+    # print('received confirmation:', message)
     print('confirmed command with ID:', ord(message.payload))
 
-# if __name__ == '__main__':
-#     rotate_gimbal()
+

@@ -8,9 +8,6 @@ from collections import namedtuple
 USB_PORT = '/dev/ttyUSB0'
 
 
-
-
-# outgoing CMD_CONTROL - control gimbal movement
 ControlData = namedtuple(
     'ControlData',
     'roll_mode pitch_mode yaw_mode roll_speed roll_angle pitch_speed pitch_angle yaw_speed yaw_angle')
@@ -19,12 +16,21 @@ Message = namedtuple(
     'Message',
     'start_character command_id payload_size header_checksum payload payload_checksum')
 
+Empty = namedtuple(
+    'Empty',
+    'empty1 empty2')
+
+ImuData = namedtuple(
+    'ImuData',
+    'roll roll_target roll_target_speed pitch pitch_target pitch_speed yaw yaw_target yaw_speed'
+)
+
 
 def pack_control_data(control_data):
     return struct.pack('<BBBhhhhhh', *control_data)
 
 
-def create_message(command_id, payload): #-> Message
+def create_message(command_id, payload=None): #-> Message
     payload_size = len(payload)
     return Message(start_character=ord('>'),
                    command_id=command_id,
@@ -56,7 +62,7 @@ def test_rotate_gimbal():
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
                                pitch_mode=0, pitch_speed=40, pitch_angle=0,
-                               yaw_mode=0, yaw_speed=40, yaw_angle=0)
+                               yaw_mode=0, yaw_speed=60, yaw_angle=0)
     print('command to send:', control_data)
     packed_control_data = pack_control_data(control_data)
     print('packed command as payload:', packed_control_data)
@@ -72,12 +78,34 @@ def test_rotate_gimbal():
     print('received confirmation:', message)
     print('confirmed command with ID:', ord(message.payload))
 
+
 # Moves gimbal with given input speed
-def move_gimbal(yaw_speed,pitch_speed):
+def speed_control(yaw_speed,pitch_speed):
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
                                pitch_mode=1, pitch_speed=pitch_speed, pitch_angle=0,
                                yaw_mode=1, yaw_speed=yaw_speed, yaw_angle=0)
+    packed_control_data = pack_control_data(control_data)
+    message = create_message(CMD_CONTROL, packed_control_data)
+    packed_message = pack_message(message)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
+    connection.write(packed_message)
+    message = read_message(connection, 1)
+
+
+def position_control(yaw,pitch):
+
+    y_imu = get_IMU_angles().yaw
+    y_enc = get_encoder_angle_yaw()
+
+    dy_imu = (yaw - y_enc)*45.5111  # difference in imu
+    y_target = y_imu - dy_imu
+    print('y_target= %s' % y_target)
+
+    CMD_CONTROL = 67
+    control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
+                               pitch_mode=0, pitch_speed=40, pitch_angle=pitch,
+                               yaw_mode=2, yaw_speed=40, yaw_angle=y_target)
     # packing and sending
     packed_control_data = pack_control_data(control_data)
     message = create_message(CMD_CONTROL, packed_control_data)
@@ -90,3 +118,43 @@ def move_gimbal(yaw_speed,pitch_speed):
     print('confirmed command with ID:', ord(message.payload))
 
 
+def get_IMU_angles():
+    CMD_GET_ANGLES = 73
+    empty_data = Empty(empty1=0, empty2=0)
+    packed_control_data = struct.pack('<hh', *empty_data)
+    
+    message = create_message(CMD_GET_ANGLES, packed_control_data)
+    packed_message = pack_message(message)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
+    connection.write(packed_message)
+    message = read_message(connection, 18)
+    imu_angles = ImuData(*struct.unpack('<hhhhhhhhh',message.payload))
+
+    return imu_angles
+
+# Outputs yaw from encoders
+def get_encoder_angle_yaw():
+    CMD_DEBUG_VARS_3 = 254
+    empty_data = Empty(empty1=0, empty2=0)
+    packed_control_data = struct.pack('<hh', *empty_data)
+    message = create_message(CMD_DEBUG_VARS_3, packed_control_data)
+    packed_message = pack_message(message)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
+    connection.write(packed_message)
+    message = read_message(connection, 23)
+    a = struct.unpack('<bbbbbbiiibbbbb',message.payload)
+    yaw = a[8]//262144*(1.0/4096*360)-74 # Conversion from enc to deg
+    return yaw
+
+
+if __name__=="__main__":
+    position_control(0,-2340)
+
+
+
+    while 1:
+        y_imu = get_IMU_angles().yaw
+        y_enc = get_encoder_angle_yaw()
+        p_imu = get_IMU_angles().pitch
+
+        print('IMU yaw= %s, ENC yaw= %s IMU pitch= %s' % (y_imu,y_enc,p_imu))

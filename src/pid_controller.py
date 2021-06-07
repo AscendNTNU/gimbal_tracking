@@ -2,21 +2,17 @@
 
 class Controller:
 
-    def __init__(self):
+    def __init__(self,K_p=1):
         # P I D parameters
-        self.KY_p = 1
-        self.KX_p = 1
+        self.K_p = K_p
 
-        # Reference paramers
-        self.r_x = 320
-        self.r_y = 256
-
+        # TODO Add I and D support
         # previous variables for I and D?
         # x-1 x-2...
 
-    def get_input(self,measure_x,measure_y):
-        u_yaw = -self.KX_p * (self.r_x - measure_x)
-        u_pitch = -self.KY_p * (self.r_y - measure_y)
+    def get_input(self,error_x,error_y):
+        u_yaw = -self.K_p * error_x
+        u_pitch = -self.K_p * error_y
         return u_yaw, u_pitch
 
 

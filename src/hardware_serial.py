@@ -42,7 +42,7 @@ def create_message(command_id, payload=None): #-> Message
 
 def pack_message(message): # -> bytes:
     message_format = '<BBBB{}sB'.format(message.payload_size)
-    return bytes(struct.pack(message_format, *message))
+    return bytes(struct.pack(message_format, *message))    
 
 
 def unpack_message(data, payload_size): # -> Message:
@@ -79,7 +79,7 @@ def test_rotate_gimbal():
     print('confirmed command with ID:', ord(message.payload))
 
 
-# Moves gimbal with given input speed
+
 def speed_control(yaw_speed,pitch_speed):
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
@@ -94,18 +94,22 @@ def speed_control(yaw_speed,pitch_speed):
 
 
 def position_control(yaw,pitch):
-
+    '''Input in degrees
+    - zero pitch is horizon level
+    - zero yaw is forward in frame
+    '''
+    # Conversion from degree to IMU target
     y_imu = get_IMU_angles().yaw
     y_enc = get_encoder_angle_yaw()
-
     dy_imu = (yaw - y_enc)*45.5111  # difference in imu
     y_target = y_imu - dy_imu
-    print('y_target= %s' % y_target)
+
+    p_target = pitch*-45.5111 - 2048
 
     CMD_CONTROL = 67
     control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
-                               pitch_mode=0, pitch_speed=40, pitch_angle=pitch,
-                               yaw_mode=2, yaw_speed=40, yaw_angle=y_target)
+                               pitch_mode=2, pitch_speed=40, pitch_angle=p_target,
+                               yaw_mode=2, yaw_speed=100, yaw_angle=y_target)
     # packing and sending
     packed_control_data = pack_control_data(control_data)
     message = create_message(CMD_CONTROL, packed_control_data)
@@ -114,22 +118,31 @@ def position_control(yaw,pitch):
     connection.write(packed_message)
     # reading confirmaton
     message = read_message(connection, 1)
-    # print('received confirmation:', message)
-    print('confirmed command with ID:', ord(message.payload))
+
+
+def follow_yaw_mode():
+    CMD_CONTROL = 67
+    control_data = ControlData(roll_mode=0, roll_speed=0, roll_angle=0,
+                               pitch_mode=0, pitch_speed=0, pitch_angle=0,
+                               yaw_mode=0, yaw_speed=0, yaw_angle=0)
+    packed_control_data = pack_control_data(control_data)
+    message = create_message(CMD_CONTROL, packed_control_data)
+    packed_message = pack_message(message)
+    connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
+    connection.write(packed_message)
+    message = read_message(connection, 1)
 
 
 def get_IMU_angles():
     CMD_GET_ANGLES = 73
     empty_data = Empty(empty1=0, empty2=0)
-    packed_control_data = struct.pack('<hh', *empty_data)
-    
+    packed_control_data = struct.pack('<hh', *empty_data)    
     message = create_message(CMD_GET_ANGLES, packed_control_data)
     packed_message = pack_message(message)
     connection = serial.Serial(USB_PORT, baudrate=115200, timeout=10)
     connection.write(packed_message)
     message = read_message(connection, 18)
     imu_angles = ImuData(*struct.unpack('<hhhhhhhhh',message.payload))
-
     return imu_angles
 
 # Outputs yaw from encoders
@@ -148,9 +161,7 @@ def get_encoder_angle_yaw():
 
 
 if __name__=="__main__":
-    position_control(0,-2340)
-
-
+    # position_control(0,0)
 
     while 1:
         y_imu = get_IMU_angles().yaw

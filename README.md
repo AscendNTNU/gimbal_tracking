@@ -1,4 +1,4 @@
-# gimbal_tracking
+# Gimbal Tracking
 Gimbal state machine for TAC mission, including visual tracking
 
 ![ezgif com-gif-maker (1)](https://user-images.githubusercontent.com/55540484/121034057-027dca80-c7ad-11eb-9780-2156c4ea7074.gif)

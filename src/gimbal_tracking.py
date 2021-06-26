@@ -7,6 +7,7 @@ from enum import Enum
 import time
 import threading
 import signal
+from std_srvs.srv import Trigger, TriggerResponse
 
 import pid_controller
 import hardware_serial as hw
@@ -47,7 +48,11 @@ class Gimbal_FSM:
     def stop(self):
         hw.speed_control(0,0)
 
-
+    def get_set_rth_cb(self):
+        def set_rth_cb(data): # data: Trigger
+            self.state = State.RETURN+TO_HOME
+            return TriggerResponse(success=True)
+        return set_rth_cb
 
 
 gimbal = Gimbal_FSM()
@@ -70,8 +75,13 @@ def cb_detection(data):
 
 if __name__ == "__main__":
     rospy.init_node("gimbal_tracking")
-    rospy.Subscriber("/superfluid/detections",Detection2DArray,cb_detection)
-    
+    # TODO change to /superfluid/observations_out
+    rospy.Subscriber("/superfluid/detections", Detection2DArray, cb_detection)
+    rospy.Service(
+        "/gimbal/return_to_home",
+        Trigger,
+        gimbal.get_set_rth_cb(),
+    )
     rate = rospy.Rate(10)
     while not rospy.is_shutdown():
 

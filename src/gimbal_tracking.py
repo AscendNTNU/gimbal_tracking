@@ -75,8 +75,7 @@ def cb_detection(data):
 
 if __name__ == "__main__":
     rospy.init_node("gimbal_tracking")
-    # TODO change to /superfluid/observations_out
-    rospy.Subscriber("/superfluid/detections", Detection2DArray, cb_detection)
+    rospy.Subscriber("/superfluid/detections_out", Detection2DArray, cb_detection)
     rospy.Service(
         "/gimbal/return_to_home",
         Trigger,
